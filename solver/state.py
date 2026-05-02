@@ -20,6 +20,7 @@ class Botella:
     idx: int                          # índice en el estado (0-based)
     espacios: list[Optional[str]]     # 4 slots, None = vacío
     bloqueo: Optional[dict] = None    # bloqueo individual, None si no tiene
+    idbotella: int = 0                # id original en la DB (para reporte)
 
     def __post_init__(self):
         assert len(self.espacios) == CAPACIDAD
@@ -117,7 +118,7 @@ class Botella:
                     break
 
     def copia(self) -> "Botella":
-        return Botella(self.idx, list(self.espacios), self.bloqueo)
+        return Botella(self.idx, list(self.espacios), self.bloqueo, self.idbotella)
 
     def __repr__(self):
         return f"B{self.idx}[{','.join(e or '_' for e in self.espacios)}]"
@@ -159,21 +160,34 @@ class Estado:
 
 # ── Construcción del estado inicial desde datos de la DB ─────────
 
-def estado_desde_nivel(nivel_data: dict) -> Estado:
+def estado_desde_nivel(nivel_data: dict, descubrimientos: list[dict] | None = None) -> Estado:
     """
     Convierte los datos del nivel (output de db.cargar_nivel) al Estado inicial.
-    - Ignora las botellas que ya están completas (no debería haber, pero por las dudas).
-    - La botella extra se representa como una lista de slots vacíos de tamaño capacidadextra.
+    - descubrimientos: lista de {idbotella, posicion, color_real} — sustituye x's conocidas.
+    - Ignora las botellas que ya están completas.
+    - La botella extra se representa como lista de slots vacíos de tamaño capacidadextra.
     """
+    # Construir índice de descubrimientos: idbotella -> {posicion_1based -> color_real}
+    known: dict[int, dict[int, str]] = {}
+    for d in (descubrimientos or []):
+        bid = d["idbotella"]
+        pos = d["posicion"]   # 1-based (DB)
+        color = d["color_real"].upper()
+        known.setdefault(bid, {})[pos] = color
+
     botellas: list[Botella] = []
     idx = 0
     for grupo in nivel_data["grupos"]:
         for b in grupo["botellas"]:
             espacios = [b["espacios"][i] for i in range(4)]
+            idbotella = b["idbotella"]
+            # Sustituir x's cuyo color ya fue descubierto
+            for pos_1based, color in known.get(idbotella, {}).items():
+                arr_idx = pos_1based - 1  # convertir a índice 0-based
+                if 0 <= arr_idx < 4 and espacios[arr_idx] == "x":
+                    espacios[arr_idx] = color
             bloqueo = b.get("bloqueo")
-            # Si el bloqueo indica 'vista=N', las piezas son desconocidas para el jugador
-            # pero el solver sí las conoce (trabaja con info completa)
-            botella = Botella(idx=idx, espacios=espacios, bloqueo=bloqueo)
+            botella = Botella(idx=idx, espacios=espacios, bloqueo=bloqueo, idbotella=idbotella)
             if not botella.esta_completa():
                 botellas.append(botella)
             idx += 1

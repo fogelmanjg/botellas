@@ -1,12 +1,13 @@
 """FastAPI solver service."""
 
+import threading
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import threading
 
-from db import cargar_nivel, guardar_solucion, marcar_resolviendo
-from state import estado_desde_nivel
+from db import cargar_nivel, cargar_descubrimientos, guardar_solucion, marcar_resolviendo
+from state import Estado, estado_desde_nivel
 from engine import resolver
+from reveal import caminos_revelacion
 
 app = FastAPI(title="Botellas Solver", version="1.0.0")
 
@@ -27,46 +28,71 @@ def health():
 def resolver_nivel(idnivel: int, async_mode: bool = False):
     """
     Resuelve un nivel y guarda la solución en la DB.
+
+    Si el nivel tiene piezas ocultas (x) sin descubrir, retorna
+    recomendaciones de revelación en lugar de una solución completa.
+
     - async_mode=false (default): bloquea hasta tener resultado.
-    - async_mode=true: inicia en background y retorna inmediatamente.
+    - async_mode=true: inicia en background (solo para niveles sin x's).
     """
     try:
         nivel_data = cargar_nivel(idnivel)
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Nivel no encontrado: {e}")
 
+    descubrimientos = cargar_descubrimientos(idnivel)
+    estado = estado_desde_nivel(nivel_data, descubrimientos)
+
+    tiene_x = any(
+        e == "x"
+        for b in estado.botellas
+        for e in b.espacios
+        if e is not None
+    )
+
+    if tiene_x:
+        # Reveal mode: siempre sincrónico
+        return _ejecutar_revelacion(idnivel, estado)
+
     if async_mode:
         marcar_resolviendo(idnivel)
-        t = threading.Thread(target=_resolver_bg, args=(idnivel, nivel_data), daemon=True)
+        t = threading.Thread(target=_resolver_bg, args=(idnivel, estado), daemon=True)
         t.start()
         return {"status": "resolviendo", "idnivel": idnivel}
 
-    return _ejecutar_solver(idnivel, nivel_data)
+    return _ejecutar_solver(idnivel, estado)
 
 
-def _resolver_bg(idnivel: int, nivel_data: dict):
+def _resolver_bg(idnivel: int, estado: Estado):
     try:
-        _ejecutar_solver(idnivel, nivel_data)
-    except Exception as e:
+        _ejecutar_solver(idnivel, estado)
+    except Exception:
         guardar_solucion(idnivel, [], "X")
 
 
-def _ejecutar_solver(idnivel: int, nivel_data: dict) -> dict:
-    estado = estado_desde_nivel(nivel_data)
-    marcar_resolviendo(idnivel)
+def _ejecutar_revelacion(idnivel: int, estado: Estado) -> dict:
+    recomendaciones = caminos_revelacion(estado)
+    guardar_solucion(idnivel, [], "X")
+    return {
+        "status": "revelacion",
+        "idnivel": idnivel,
+        "recomendaciones": recomendaciones,
+    }
 
-    solucion = resolver(estado)
+
+def _ejecutar_solver(idnivel: int, estado: Estado) -> dict:
+    marcar_resolviendo(idnivel)
+    solucion, timed_out = resolver(estado)
 
     if solucion is None:
         guardar_solucion(idnivel, [], "X")
-        return {"status": "sin_solucion", "idnivel": idnivel, "pasos": 0}
+        status = "timeout" if timed_out else "sin_solucion"
+        return {"status": status, "idnivel": idnivel, "pasos": 0}
 
-    # Serializar pasos eliminando campos internos (_extra_idx, etc.)
-    pasos_limpios = []
-    for mov in solucion:
-        paso = {k: v for k, v in mov.items() if not k.startswith("_")}
-        pasos_limpios.append(paso)
-
+    pasos_limpios = [
+        {k: v for k, v in mov.items() if not k.startswith("_")}
+        for mov in solucion
+    ]
     guardar_solucion(idnivel, pasos_limpios, "S")
     return {
         "status": "resuelto",
