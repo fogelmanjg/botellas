@@ -1,0 +1,30 @@
+<div class="botella" [class.seleccionada]="seleccionada()" [class.bloqueada]="bloqueada() || bloqueoTipo() !== null">
+  @for (e of espacios(); track $index; let i = $index) {
+    <div
+      class="espacio"
+      [ngStyle]="{ background: colorDe(e) }"
+      [class.vacio]="!e"
+      [class.oculto]="e === 'x'"
+      (click)="onClickEspacio(i)"
+    >
+      <span [class.texto-oscuro]="esClaro(e)">{{ textoDe(e) }}</span>
+    </div>
+  }
+
+  @if (bloqueoTipo() === 'lona_color') {
+    <div class="overlay-lona" [ngStyle]="lonaStyle()">
+      <span class="lona-letra">{{ bloqueoColor() ?? '?' }}</span>
+    </div>
+  }
+
+  @if (bloqueoTipo() === 'traba') {
+    <div class="overlay-traba">
+      <div class="cono"></div>
+      <div class="cono"></div>
+    </div>
+  }
+
+  @if (bloqueada() && bloqueoTipo() === null) {
+    <div class="bloqueo-overlay">🔒</div>
+  }
+</div>

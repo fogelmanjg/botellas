@@ -1,0 +1,49 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      solver:
+        condition: service_healthy
+
+  solver:
+    build:
+      context: ../solver
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: botellas
+      DB_USER: botellas
+      DB_PASS: botellas_dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: botellas
+      POSTGRES_USER: botellas
+      POSTGRES_PASSWORD: botellas_dev
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U botellas -d botellas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

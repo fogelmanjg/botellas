@@ -1,0 +1,25 @@
+<div class="datos-page">
+  <h2>Importar datos</h2>
+  <p class="advertencia">Esta operación reemplaza <strong>todos</strong> los datos actuales.</p>
+
+  <label class="file-label">
+    Seleccionar archivo JSON
+    <input type="file" accept=".json" (change)="onFile($event)">
+  </label>
+
+  @if (resumen()) {
+    <div class="resumen">
+      <p>{{ resumen() }}</p>
+      <button class="btn-danger" (click)="importar()" [disabled]="loading()">
+        {{ loading() ? 'Importando...' : 'Importar (reemplaza todo)' }}
+      </button>
+    </div>
+  }
+
+  @if (ok()) {
+    <p class="ok">Importación completada correctamente.</p>
+  }
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+</div>
