@@ -126,6 +126,22 @@ def guardar_solucion(idnivel: int, pasos: list, estado: str):
         cur.close()
         conn.close()
 
+def cargar_descubrimientos(idnivel: int) -> list[dict]:
+    """Carga los descubrimientos conocidos para un nivel (piezas ocultas ya reveladas)."""
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT idbotella, posicion, color_real
+            FROM nivel_descubrimiento
+            WHERE idnivel = %s
+            ORDER BY orden
+        """, (idnivel,))
+        return [dict(r) for r in cur.fetchall()]
+    finally:
+        cur.close()
+        conn.close()
+
 def marcar_resolviendo(idnivel: int):
     conn = get_conn()
     cur = conn.cursor()

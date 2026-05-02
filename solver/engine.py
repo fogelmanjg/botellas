@@ -12,6 +12,7 @@ ciega, acortando dramáticamente el árbol para niveles con patrones frecuentes.
 """
 
 import sys
+import time
 from state import Estado
 from rules import movimientos_validos, aplicar_movimiento, completar_mov
 from strategies import ESTRATEGIAS
@@ -19,11 +20,24 @@ from strategies import ESTRATEGIAS
 sys.setrecursionlimit(50_000)
 
 MAX_PASOS = 300
+DEFAULT_TIMEOUT_S = 5.0
+
+_TIMEOUT = object()  # sentinel para propagar expiración de tiempo
 
 
-def resolver(estado_inicial: Estado) -> list[dict] | None:
+def resolver(estado_inicial: Estado, timeout_s: float = DEFAULT_TIMEOUT_S) -> tuple[list[dict] | None, bool]:
+    """
+    Intenta resolver el nivel dado.
+    Retorna (pasos, timed_out).
+    - pasos: lista de movimientos si encontró solución, None si no.
+    - timed_out: True si se agotó el tiempo antes de terminar.
+    """
     visitados: set[str] = {estado_inicial.hash()}
-    return _dfs(estado_inicial, visitados, [])
+    deadline = time.monotonic() + timeout_s
+    resultado = _dfs(estado_inicial, visitados, [], deadline)
+    if resultado is _TIMEOUT:
+        return None, True
+    return resultado, False
 
 
 def _fingerprint(mov: dict) -> str:
@@ -34,7 +48,10 @@ def _fingerprint(mov: dict) -> str:
     return f"{mov['tipo']}|{mov.get('desde')}|{mov.get('hasta')}|{tuple(mov.get('piezas', []))}|{autos}"
 
 
-def _dfs(estado: Estado, visitados: set[str], camino: list[dict]) -> list[dict] | None:
+def _dfs(estado: Estado, visitados: set[str], camino: list[dict], deadline: float):
+    if time.monotonic() > deadline:
+        return _TIMEOUT
+
     if estado.esta_resuelto():
         return list(camino)
 
@@ -53,8 +70,8 @@ def _dfs(estado: Estado, visitados: set[str], camino: list[dict]) -> list[dict] 
             if fp in intentados:
                 continue
             intentados.add(fp)
-            resultado = _intentar(mov, estado, visitados, camino)
-            if resultado is not None:
+            resultado = _intentar(mov, estado, visitados, camino, deadline)
+            if resultado is _TIMEOUT or resultado is not None:
                 return resultado
 
     # ── Fase 2: fallback — todos los movimientos válidos ─────────
@@ -63,21 +80,24 @@ def _dfs(estado: Estado, visitados: set[str], camino: list[dict]) -> list[dict] 
         if fp in intentados:
             continue
         intentados.add(fp)
-        resultado = _intentar(mov, estado, visitados, camino)
-        if resultado is not None:
+        resultado = _intentar(mov, estado, visitados, camino, deadline)
+        if resultado is _TIMEOUT or resultado is not None:
             return resultado
 
     return None
 
 
-def _intentar(mov: dict, estado: Estado, visitados: set[str], camino: list[dict]) -> list[dict] | None:
+def _intentar(mov: dict, estado: Estado, visitados: set[str], camino: list[dict], deadline: float):
     nuevo = aplicar_movimiento(estado, mov)
     h = nuevo.hash()
     if h in visitados:
         return None
     visitados.add(h)
     camino.append(mov)
-    resultado = _dfs(nuevo, visitados, camino)
+    resultado = _dfs(nuevo, visitados, camino, deadline)
+    if resultado is _TIMEOUT:
+        camino.pop()
+        return _TIMEOUT
     if resultado is not None:
         return resultado
     camino.pop()
