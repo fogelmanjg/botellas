@@ -1,0 +1,110 @@
+.botella {
+  position: relative;
+  display: flex;
+  flex-direction: column-reverse; // espacio1 abajo, espacio4 arriba
+  width: 56px;
+  border: 3px solid #555;
+  border-radius: 0 0 12px 12px;
+  border-top: none;
+  overflow: hidden;
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+
+  &.seleccionada {
+    box-shadow: 0 0 0 3px #f1c40f;
+  }
+
+  &.bloqueada {
+    cursor: not-allowed;
+  }
+}
+
+
+.espacio {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid rgba(0,0,0,0.15);
+  transition: background 0.1s;
+
+  span {
+    font-weight: bold;
+    font-size: 13px;
+    color: rgba(255,255,255,0.85);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    pointer-events: none;
+
+    &.texto-oscuro {
+      color: #111 !important;
+      text-shadow: none;
+    }
+  }
+
+  &.vacio {
+    background: #1a1a2e !important;
+  }
+
+  &.oculto {
+    background: repeating-linear-gradient(
+      45deg,
+      #3a3a3a,
+      #3a3a3a 5px,
+      #555 5px,
+      #555 10px
+
+    ) !important;
+  }
+}
+
+// Lona de color: tapa la botella con rayas del color que desbloquea
+.overlay-lona {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lona-letra {
+  font-size: 22px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.6);
+}
+
+// Traba / conos: dos conitos de tránsito en la boca
+.overlay-traba {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+  z-index: 5;
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
+  pointer-events: none;
+}
+
+.cono {
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 20px solid #e67e22;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+}
+
+// Overlay genérico (bloqueo sin tipo)
+.bloqueo-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: rgba(0,0,0,0.3);
+}

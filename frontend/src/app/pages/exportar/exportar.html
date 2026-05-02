@@ -1,0 +1,10 @@
+<div class="datos-page">
+  <h2>Exportar datos</h2>
+  <p class="desc">Descarga un archivo JSON con todos los juegos, niveles, bloqueos y estrategias.</p>
+  <button class="btn-primary" (click)="exportar()" [disabled]="loading()">
+    {{ loading() ? 'Exportando...' : 'Descargar JSON' }}
+  </button>
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+</div>
